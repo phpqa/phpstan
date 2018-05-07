@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -e
+
+printf "Environment variables:\\n"
+printf "SOURCE_BRANCH=\"${SOURCE_BRANCH}\"\\n"
+printf "SOURCE_COMMIT=\"${SOURCE_COMMIT}\"\\n"
+printf "COMMIT_MSG=\"${COMMIT_MSG}\"\\n"
+printf "DOCKER_REPO=\"${DOCKER_REPO}\"\\n"
+printf "DOCKERFILE_PATH=\"${DOCKERFILE_PATH}\"\\n"
+printf "CACHE_TAG=\"${CACHE_TAG}\"\\n"
+printf "IMAGE_NAME=\"${IMAGE_NAME}\"\\n"
+
+if test "${SOURCE_BRANCH}" = "master"; then
+    VERSION_ONLY_TAG=$(sed -n "s/ARG PACKAGE_VERSION=\"\(.*\)\"/\1/p" Dockerfile)
+
+    printf "Pushing ${IMAGE_NAME} also as ${DOCKER_REPO}:${VERSION_ONLY_TAG}\\n"
+    docker tag ${IMAGE_NAME} ${DOCKER_REPO}:${VERSION_ONLY_TAG}
+    docker push ${DOCKER_REPO}:${VERSION_ONLY_TAG}
+fi

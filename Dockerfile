@@ -1,31 +1,55 @@
-FROM php:7.1-alpine
-MAINTAINER Bart Reunes <metalarend@gmail.com>
+# Set defaults
 
-# Install Composer globally - https://github.com/composer/composer
+ARG COMPOSER_IMAGE="composer:1.6.4"
+ARG BASE_IMAGE="php:7.2-alpine"
+ARG PACKAGE_NAME="phpstan/phpstan"
+ARG PACKAGE_VERSION="0.9.2"
 
-ENV COMPOSER_HOME /composer
-ENV COMPOSER_ALLOW_SUPERUSER 1
-ENV PATH /composer/vendor/bin:$PATH
+# Download with Composer - https://getcomposer.org/
 
-RUN curl https://getcomposer.org/installer -o /tmp/composer-setup.php \
-    && curl https://composer.github.io/installer.sig -o /tmp/composer-setup.sig \
-    && php -r "if (hash_file('SHA384', '/tmp/composer-setup.php') !== trim(file_get_contents('/tmp/composer-setup.sig'))) { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;" \
-    && php /tmp/composer-setup.php --no-ansi --install-dir=/usr/local/bin --filename=composer \
-    && php -r "unlink('/tmp/composer-setup.php');" \
-    && php -r "unlink('/tmp/composer-setup.sig');"
+FROM ${COMPOSER_IMAGE} as composer
+ARG PACKAGE_NAME
+ARG PACKAGE_VERSION
+RUN COMPOSER_HOME="/composer" \
+    composer global require --prefer-dist --no-progress --dev ${PACKAGE_NAME}:${PACKAGE_VERSION}
+
+# Build image
+
+FROM ${BASE_IMAGE}
+ARG IMAGE_NAME
+ARG INTERNAL_TAG
+ARG BUILD_DATE
+ARG VCS_REF
 
 # Install Tini - https://github.com/krallin/tini
 
-RUN apk add --update --no-cache tini \
-    && rm -rf /var/cache/apk/* /var/tmp/* /tmp/*
+RUN apk add --no-cache tini
 
 # Install PHPStan - https://github.com/phpstan/phpstan
 
-RUN echo "memory_limit=-1" > $PHP_INI_DIR/conf.d/memory-limit.ini
-RUN composer global require --dev phpstan/phpstan
+COPY --from=composer "/composer/vendor" "/vendor/"
+ENV PATH /vendor/bin:${PATH}
+
+# Add entrypoint script
+
+COPY ./docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Add image labels
+
+LABEL org.label-schema.schema-version="1.0" \
+      org.label-schema.vendor="phpqa" \
+      org.label-schema.name="phpstan" \
+      org.label-schema.version="${INTERNAL_TAG}" \
+      org.label-schema.build-date="${BUILD_DATE}" \
+      org.label-schema.url="https://github.com/phpqa/phpstan" \
+      org.label-schema.usage="https://github.com/phpqa/phpstan/README.md" \
+      org.label-schema.vcs-url="https://github.com/phpqa/phpstan.git" \
+      org.label-schema.vcs-ref="${VCS_REF}" \
+      org.label-schema.docker.cmd="docker run --rm --volume \${PWD}:/app --workdir /app ${IMAGE_NAME}"
 
 # Package container
 
-VOLUME ["/app"]
 WORKDIR "/app"
-ENTRYPOINT ["/sbin/tini", "--", "phpstan"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["phpstan"]
