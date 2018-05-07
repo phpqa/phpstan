@@ -149,7 +149,7 @@ test-tag-%-image:
 	)
 
 	@printf "Container can be run with the content of the label \"org.label-schema.docker.cmd\": "
-	@$(call status_after_run, $$(docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $(BUILD_IMAGE_NAME):$($@_TAG) --quiet) | sed 's#$${PWD}#$(pwd)#') > /dev/null)
+	@$(call status_after_run, $$(docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }} $(TEST_COMMAND_WITH_FLAG)" $$(docker images $(BUILD_IMAGE_NAME):$($@_TAG) --quiet) | sed 's#$${PWD}#$(pwd)#') > /dev/null)
 
 	@printf "Container understands command with flag: "
 	@$(call status_after_run, docker run --rm $(BUILD_IMAGE_NAME):$($@_TAG) $(TEST_COMMAND_WITH_FLAG) > /dev/null)
