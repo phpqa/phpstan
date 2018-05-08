@@ -5,12 +5,12 @@
 THIS_MAKEFILE = $(lastword $(MAKEFILE_LIST))
 THIS_MAKE = $(MAKE) --file $(THIS_MAKEFILE)
 
+DOCKER_REPO = local/$(shell basename "$(shell pwd)")
 DOCKERFILE_PATH = Dockerfile
 DOCKER_COMPOSE_FILE_PATH = docker-compose.test.yml
 DOCKERFILE_PACKAGE_VERSION := $(shell sed -n "s/ARG PACKAGE_VERSION=\"\(.*\)\"/\1/p" $(DOCKERFILE_PATH))
 DOCKERFILE_BASE_IMAGE := $(shell sed -n "s/ARG BASE_IMAGE=\"\(.*\)\"/\1/p" $(DOCKERFILE_PATH) | sed -e '1 s/:/-/; t')
 DOCKERFILE_TAG := $(shell printf "$(DOCKERFILE_PACKAGE_VERSION)-on-$(DOCKERFILE_BASE_IMAGE)")
-IMAGE_NAME = local/$(shell basename "$(shell pwd)")
 
 COMMAND_FOR_VERSION = --version
 COMMAND_WITH_FLAG = $(shell basename "$(shell pwd)") --version
@@ -67,17 +67,17 @@ master-branch-image:
 		SOURCE_BRANCH="master" \
 		SOURCE_COMMIT="this is not a commit" \
 		COMMIT_MSG="this is not a commit message" \
-		DOCKER_REPO="$(IMAGE_NAME)" \
+		DOCKER_REPO="$(DOCKER_REPO)" \
 		DOCKERFILE_PATH="$(DOCKERFILE_PATH)" \
 		CACHE_TAG="" \
-		IMAGE_NAME="$(IMAGE_NAME):latest" \
+		IMAGE_NAME="$(DOCKER_REPO):latest" \
 		sh ./hooks/build
 
 # Clean the image from the master branch
 clean-master-branch-image:
 
 	@printf "$(STYLE_TITLE)Removing the image from the master branch $(STYLE_RESET)\\n"
-	@docker rmi $(IMAGE_NAME):latest
+	@docker rmi $(DOCKER_REPO):latest
 
 # Build an image from the tag "%"
 tag-%-image:
@@ -88,10 +88,10 @@ tag-%-image:
 		SOURCE_BRANCH="$($@_TAG)" \
 		SOURCE_COMMIT="this is not a commit" \
 		COMMIT_MSG="this is not a commit message" \
-		DOCKER_REPO="$(IMAGE_NAME)" \
+		DOCKER_REPO="$(DOCKER_REPO)" \
 		DOCKERFILE_PATH="$(DOCKERFILE_PATH)" \
 		CACHE_TAG="" \
-		IMAGE_NAME="$(IMAGE_NAME):$($@_TAG)" \
+		IMAGE_NAME="$(DOCKER_REPO):$($@_TAG)" \
 		sh ./hooks/build
 
 # Clean the image from the tag "%"
@@ -99,19 +99,15 @@ clean-tag-%-image:
 
 	$(eval $@_TAG := $(patsubst clean-tag-%-image,%,$@))
 	@printf "$(STYLE_TITLE)Removing the image from the tag $($@_TAG) $(STYLE_RESET)\\n"
-	@docker rmi $(IMAGE_NAME):$($@_TAG)
+	@docker rmi $(DOCKER_REPO):$($@_TAG)
 
 # Build an image from the docker-compose.test.yml file
 docker-compose-test-image:
 
 	@printf "$(STYLE_TITLE)Building an image from the $(DOCKER_COMPOSE_FILE_PATH) file $(STYLE_RESET)\\n"
 	@ \
-		export BASE_IMAGE="$$(printf "$(DOCKERFILE_TAG)" | awk -F "-on-" '{print $$2}' | sed -e '1 s/\-/:/; t')"; \
-		export PACKAGE_VERSION="$$(printf "$(DOCKERFILE_TAG)" | awk -F "-on-" '{print $$1}')"; \
-		export INTERNAL_TAG="$(DOCKERFILE_TAG)"; \
-		export BUILD_DATE="$$(date -u +"%Y-%m-%dT%H:%M:%SZ")"; \
-		export VCS_REF="$$(git rev-parse HEAD)"; \
-		export IMAGE_NAME="$(IMAGE_NAME):$(DOCKERFILE_TAG)"; \
+		export SOURCE_BRANCH="$(DOCKERFILE_TAG)"; \
+		export IMAGE_NAME="$(DOCKER_REPO):$(DOCKERFILE_TAG)"; \
 		docker-compose --file $(DOCKER_COMPOSE_FILE_PATH) --project-name ci build
 
 	@printf "$(STYLE_TITLE)Running the image from the $(DOCKER_COMPOSE_FILE_PATH) file $(STYLE_RESET)\\n"
@@ -137,48 +133,48 @@ status_after_run = result="$$($(1) 2>&1)"; if test "$$?" = "0"; then printf '$(S
 test-master-branch-image:
 
 	$(eval $@_TAG := latest)
-	$(eval $@_IMAGE := $(IMAGE_NAME):$($@_TAG))
+	$(eval $@_IMAGE_NAME := $(DOCKER_REPO):$($@_TAG))
 
 	@printf "$(STYLE_TITLE)Running tests for master branch $(STYLE_RESET)\\n"
 
 	@printf "Image was built: "
-	@$(call status_after_run, test -n "$$(docker image ls $($@_IMAGE) --quiet)")
+	@$(call status_after_run, test -n "$$(docker image ls $($@_IMAGE_NAME) --quiet)")
 
-	@printf "Image contains label \"org.label-schema.version\" with version \"$(DOCKERFILE_TAG)\": "
+	@printf "Image contains label \"org.label-schema.version\" with version \"master\": "
 	@$(call status_after_run, \
-		docker inspect --format "{{ index .Config.Labels \"org.label-schema.version\" }}" $$(docker images $($@_IMAGE) --quiet) \
-			| grep --quiet "\b$(DOCKERFILE_TAG)\b" \
+		docker inspect --format "{{ index .Config.Labels \"org.label-schema.version\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
+			| grep --quiet "\bmaster\b" \
 	)
 
 	@printf "Image contains label \"org.label-schema.docker.cmd\" with version \"$($@_TAG)\": "
 	@$(call status_after_run, \
-		docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $($@_IMAGE) --quiet) \
+		docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
 			| grep --quiet "\b$($@_TAG)\b" \
 	)
 
 	@printf "Container can run with the content of the label \"org.label-schema.docker.cmd\": "
 	@$(call status_after_run, \
 		$$( \
-			docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }} $(COMMAND_WITH_FLAG)" $$(docker images $($@_IMAGE) --quiet) \
+			docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }} $(COMMAND_WITH_FLAG)" $$(docker images $($@_IMAGE_NAME) --quiet) \
 				| sed 's#$${PWD}#$(pwd)#' \
 		) \
 	)
 
 	@printf "Container understands command with flag \"$(COMMAND_WITH_FLAG)\": "
-	@$(call status_after_run, docker run --rm $($@_IMAGE) $(COMMAND_WITH_FLAG))
+	@$(call status_after_run, docker run --rm $($@_IMAGE_NAME) $(COMMAND_WITH_FLAG))
 
 	@printf "Container understands only a flag \"$(COMMAND_FLAG_ONLY)\": "
-	@$(call status_after_run, docker run --rm $($@_IMAGE) $(COMMAND_FLAG_ONLY))
+	@$(call status_after_run, docker run --rm $($@_IMAGE_NAME) $(COMMAND_FLAG_ONLY))
 
 	@printf "Container understands other commands: "
-	@$(call status_after_run, docker run --rm $($@_IMAGE) test -x "$$(command -v ls)")
+	@$(call status_after_run, docker run --rm $($@_IMAGE_NAME) test -x "$$(command -v ls)")
 
 	@printf "Container understands entrypoint override: "
-	@$(call status_after_run, docker run --rm --entrypoint "" $($@_IMAGE) ls "$$(command -v ls)")
+	@$(call status_after_run, docker run --rm --entrypoint "" $($@_IMAGE_NAME) ls "$$(command -v ls)")
 
 	@printf "Container version contains \"$(DOCKERFILE_PACKAGE_VERSION)\": "
 	@$(call status_after_run, \
-		docker run --rm $($@_IMAGE) $(COMMAND_FOR_VERSION) \
+		docker run --rm $($@_IMAGE_NAME) $(COMMAND_FOR_VERSION) \
 			| head -n 1 | grep --quiet "$(DOCKERFILE_PACKAGE_VERSION)" \
 	)
 
@@ -187,75 +183,75 @@ test-tag-%-image:
 
 	$(eval $@_TAG := $(patsubst test-tag-%-image,%,$@))
 	$(eval $@_TAG_PACKAGE_VERSION := $(shell printf "$($@_TAG)" | awk -F "-on-" '{print $$1}'))
-	$(eval $@_IMAGE := $(IMAGE_NAME):$($@_TAG))
+	$(eval $@_IMAGE_NAME := $(DOCKER_REPO):$($@_TAG))
 
 	@printf "$(STYLE_TITLE)Running tests for tag $($@_TAG) $(STYLE_RESET)\\n"
 
 	@printf "Image was built: "
-	@$(call status_after_run, test -n "$$(docker image ls $($@_IMAGE) --quiet)")
+	@$(call status_after_run, test -n "$$(docker image ls $($@_IMAGE_NAME) --quiet)")
 
 	@printf "Image contains label \"org.label-schema.version\" with version \"$($@_TAG)\": "
 	@$(call status_after_run, \
-		docker inspect --format "{{ index .Config.Labels \"org.label-schema.version\" }}" $$(docker images $($@_IMAGE) --quiet) \
+		docker inspect --format "{{ index .Config.Labels \"org.label-schema.version\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
 			| grep --quiet "\b$($@_TAG)\b" \
 	)
 
 	@printf "Image contains label \"org.label-schema.docker.cmd\" with version \"$($@_TAG)\": "
 	@$(call status_after_run, \
-		docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $($@_IMAGE) --quiet) \
+		docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
 			| grep --quiet "\b$($@_TAG)\b" \
 	)
 
 	@printf "Container can run with the content of the label \"org.label-schema.docker.cmd\": "
 	@$(call status_after_run, \
 		$$( \
-			docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }} $(COMMAND_WITH_FLAG)" $$(docker images $($@_IMAGE) --quiet) \
+			docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }} $(COMMAND_WITH_FLAG)" $$(docker images $($@_IMAGE_NAME) --quiet) \
 				| sed 's#$${PWD}#$(pwd)#' \
 		) \
 	)
 
 	@printf "Container understands command with flag \"$(COMMAND_WITH_FLAG)\": "
-	@$(call status_after_run, docker run --rm $($@_IMAGE) $(COMMAND_WITH_FLAG))
+	@$(call status_after_run, docker run --rm $($@_IMAGE_NAME) $(COMMAND_WITH_FLAG))
 
 	@printf "Container understands only a flag \"$(COMMAND_FLAG_ONLY)\": "
-	@$(call status_after_run, docker run --rm $($@_IMAGE) $(COMMAND_FLAG_ONLY))
+	@$(call status_after_run, docker run --rm $($@_IMAGE_NAME) $(COMMAND_FLAG_ONLY))
 
 	@printf "Container understands other commands: "
-	@$(call status_after_run, docker run --rm $($@_IMAGE) test -x "$$(command -v ls)")
+	@$(call status_after_run, docker run --rm $($@_IMAGE_NAME) test -x "$$(command -v ls)")
 
 	@printf "Container understands entrypoint override: "
-	@$(call status_after_run, docker run --rm --entrypoint "" $($@_IMAGE) ls "$$(command -v ls)")
+	@$(call status_after_run, docker run --rm --entrypoint "" $($@_IMAGE_NAME) ls "$$(command -v ls)")
 
 	@printf "Container version contains \"$($@_TAG_PACKAGE_VERSION)\": "
 	@$(call status_after_run, \
-		docker run --rm $($@_IMAGE) $(COMMAND_FOR_VERSION) \
+		docker run --rm $($@_IMAGE_NAME) $(COMMAND_FOR_VERSION) \
 			| head -n 1 | grep --quiet "$($@_TAG_PACKAGE_VERSION)" \
 	)
 
 # Test the image from the docker-compose.test.yml file
 test-docker-compose-image:
 
-	$(eval $@_IMAGE := ci_sut)
+	$(eval $@_IMAGE_NAME := ci_sut)
 
 	@printf "$(STYLE_TITLE)Running tests for $(DOCKER_COMPOSE_FILE_PATH) $(STYLE_RESET)\\n"
 
 	@printf "Image was built: "
-	@$(call status_after_run, test -n "$$(docker image ls $($@_IMAGE) --quiet)")
+	@$(call status_after_run, test -n "$$(docker image ls $($@_IMAGE_NAME) --quiet)")
 
 	@printf "Image contains label \"org.label-schema.version\" with version \"$(DOCKERFILE_TAG)\": "
 	@$(call status_after_run, \
-		docker inspect --format "{{ index .Config.Labels \"org.label-schema.version\" }}" $$(docker images $($@_IMAGE) --quiet) \
+		docker inspect --format "{{ index .Config.Labels \"org.label-schema.version\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
 			| grep --quiet "\b$(DOCKERFILE_TAG)\b" \
 	)
 
 	@printf "Image contains label \"org.label-schema.docker.cmd\" with version \"$(DOCKERFILE_TAG)\": "
 	@$(call status_after_run, \
-		docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $($@_IMAGE) --quiet) \
+		docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
 			| grep --quiet "\b$(DOCKERFILE_TAG)\b" \
 	)
 
 	@printf "Container can run with the settings from $(DOCKER_COMPOSE_FILE_PATH): "
-	@$(call status_after_run, docker wait $($@_IMAGE)_1)
+	@$(call status_after_run, docker wait $($@_IMAGE_NAME)_1)
 
 	@printf "Container understands command with flag \"$(COMMAND_WITH_FLAG)\": "
 	@$(call status_after_run, docker-compose --file $(DOCKER_COMPOSE_FILE_PATH) --project-name ci --no-ansi run --rm sut $(COMMAND_WITH_FLAG))

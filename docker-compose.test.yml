@@ -6,10 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - BASE_IMAGE
-        - PACKAGE_VERSION
-        - INTERNAL_TAG
-        - BUILD_DATE
-        - VCS_REF
+        - SOURCE_BRANCH
         - IMAGE_NAME
     command: --version

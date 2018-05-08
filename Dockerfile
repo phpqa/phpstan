@@ -18,10 +18,10 @@ RUN COMPOSER_HOME="/composer" \
 
 FROM ${BASE_IMAGE}
 ARG TOOL_NAME
-ARG INTERNAL_TAG
+ARG SOURCE_BRANCH
+ARG IMAGE_NAME
 ARG BUILD_DATE
 ARG VCS_REF
-ARG IMAGE_NAME
 
 # Install Tini - https://github.com/krallin/tini
 
@@ -42,7 +42,7 @@ RUN chmod +x /docker-entrypoint.sh
 LABEL org.label-schema.schema-version="1.0" \
       org.label-schema.vendor="phpqa" \
       org.label-schema.name="${TOOL_NAME}" \
-      org.label-schema.version="${INTERNAL_TAG}" \
+      org.label-schema.version="${SOURCE_BRANCH}" \
       org.label-schema.build-date="${BUILD_DATE}" \
       org.label-schema.url="https://github.com/phpqa/${TOOL_NAME}" \
       org.label-schema.usage="https://github.com/phpqa/${TOOL_NAME}/README.md" \

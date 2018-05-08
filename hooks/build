@@ -26,7 +26,7 @@ VCS_REF="$(git rev-parse HEAD)"
 printf "Build variables:\\n"
 printf "BASE_IMAGE=\"${BASE_IMAGE}\"\\n"
 printf "PACKAGE_VERSION=\"${PACKAGE_VERSION}\"\\n"
-printf "INTERNAL_TAG=\"${INTERNAL_TAG}\"\\n"
+printf "SOURCE_BRANCH=\"${SOURCE_BRANCH}\"\\n"
 printf "BUILD_DATE=\"${BUILD_DATE}\"\\n"
 printf "VCS_REF=\"${VCS_REF}\"\\n"
 printf "DOCKERFILE_PATH=\"${DOCKERFILE_PATH}\"\\n"
@@ -35,10 +35,10 @@ printf "IMAGE_NAME=\"${IMAGE_NAME}\"\\n"
 docker build \
     --build-arg BASE_IMAGE="${BASE_IMAGE}" \
     --build-arg PACKAGE_VERSION="${PACKAGE_VERSION}" \
-    --build-arg INTERNAL_TAG="${INTERNAL_TAG}" \
+    --build-arg SOURCE_BRANCH="${SOURCE_BRANCH}" \
+    --build-arg IMAGE_NAME="${IMAGE_NAME}" \
     --build-arg BUILD_DATE="${BUILD_DATE}" \
     --build-arg VCS_REF="${VCS_REF}" \
-    --build-arg IMAGE_NAME="${IMAGE_NAME}" \
     --file "${DOCKERFILE_PATH}" \
     --tag "${IMAGE_NAME}" \
     "."
