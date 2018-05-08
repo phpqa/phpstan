@@ -18,10 +18,10 @@ RUN COMPOSER_HOME="/composer" \
 
 FROM ${BASE_IMAGE}
 ARG TOOL_NAME
-ARG IMAGE_NAME
 ARG INTERNAL_TAG
 ARG BUILD_DATE
 ARG VCS_REF
+ARG IMAGE_NAME
 
 # Install Tini - https://github.com/krallin/tini
 
