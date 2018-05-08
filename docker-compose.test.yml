@@ -2,5 +2,14 @@ version: '3.3'
 
 services:
   sut:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BASE_IMAGE
+        - PACKAGE_VERSION
+        - INTERNAL_TAG
+        - BUILD_DATE
+        - VCS_REF
+        - IMAGE_NAME
     command: --version
