@@ -17,4 +17,6 @@ if test "${SOURCE_BRANCH}" = "master"; then
     printf "Pushing ${IMAGE_NAME} also as ${DOCKER_REPO}:${VERSION_ONLY_TAG}\\n"
     docker tag "${IMAGE_NAME}" "${DOCKER_REPO}:${VERSION_ONLY_TAG}"
     docker push "${DOCKER_REPO}:${VERSION_ONLY_TAG}"
+else
+    printf "Nothing to do\\n"
 fi
