@@ -8,9 +8,9 @@ THIS_MAKE = $(MAKE) --file $(THIS_MAKEFILE)
 DOCKER_REPO = local/$(shell basename "$(shell pwd)")
 DOCKERFILE_PATH = Dockerfile
 DOCKER_COMPOSE_FILE_PATH = docker-compose.test.yml
-DOCKERFILE_PACKAGE_VERSION := $(shell sed -n "s/ARG PACKAGE_VERSION=\"\(.*\)\"/\1/p" $(DOCKERFILE_PATH))
+DOCKERFILE_VERSION := $(shell sed -n "s/ARG VERSION=\"\(.*\)\"/\1/p" $(DOCKERFILE_PATH))
 DOCKERFILE_BASE_IMAGE := $(shell sed -n "s/ARG BASE_IMAGE=\"\(.*\)\"/\1/p" $(DOCKERFILE_PATH) | sed -e '1 s/:/-/; t')
-DOCKERFILE_TAG := $(shell printf "$(DOCKERFILE_PACKAGE_VERSION)-on-$(DOCKERFILE_BASE_IMAGE)")
+DOCKERFILE_TAG := $(shell printf "$(DOCKERFILE_VERSION)-on-$(DOCKERFILE_BASE_IMAGE)")
 
 COMMAND_FOR_VERSION = --version
 COMMAND_WITH_FLAG = $(shell basename "$(shell pwd)") --version
@@ -137,16 +137,16 @@ test-master-branch-image:
 
 	@printf "$(STYLE_TITLE)Running tests for master branch $(STYLE_RESET)\\n"
 
-	@printf "Image was built: "
+	@printf "Image \"%s\" was built: " "$($@_IMAGE_NAME)"
 	@$(call status_after_run, test -n "$$(docker image ls $($@_IMAGE_NAME) --quiet)")
 
-	@printf "Image contains label \"org.label-schema.version\" with version \"master\": "
+	@printf "Image \"%s\" contains label \"org.label-schema.version\" with version \"$(DOCKERFILE_VERSION)\": " "$($@_IMAGE_NAME)"
 	@$(call status_after_run, \
 		docker inspect --format "{{ index .Config.Labels \"org.label-schema.version\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
-			| grep --quiet "\bmaster\b" \
+			| grep --quiet "\b$(DOCKERFILE_VERSION)\b" \
 	)
 
-	@printf "Image contains label \"org.label-schema.docker.cmd\" with version \"$($@_TAG)\": "
+	@printf "Image \"%s\" contains label \"org.label-schema.docker.cmd\" with tag \"$($@_TAG)\": " "$($@_IMAGE_NAME)"
 	@$(call status_after_run, \
 		docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
 			| grep --quiet "\b$($@_TAG)\b" \
@@ -172,31 +172,31 @@ test-master-branch-image:
 	@printf "Container understands entrypoint override: "
 	@$(call status_after_run, docker run --rm --entrypoint "" $($@_IMAGE_NAME) ls "$$(command -v ls)")
 
-	@printf "Container version contains \"$(DOCKERFILE_PACKAGE_VERSION)\": "
+	@printf "Container version contains \"$(DOCKERFILE_VERSION)\": "
 	@$(call status_after_run, \
 		docker run --rm $($@_IMAGE_NAME) $(COMMAND_FOR_VERSION) \
-			| head -n 1 | grep --quiet "$(DOCKERFILE_PACKAGE_VERSION)" \
+			| head -n 1 | grep --quiet "$(DOCKERFILE_VERSION)" \
 	)
 
 # Test the image from the tag "%"
 test-tag-%-image:
 
 	$(eval $@_TAG := $(patsubst test-tag-%-image,%,$@))
-	$(eval $@_TAG_PACKAGE_VERSION := $(shell printf "$($@_TAG)" | awk -F "-on-" '{print $$1}'))
+	$(eval $@_TAG_VERSION := $(shell printf "$($@_TAG)" | awk -F "-on-" '{print $$1}'))
 	$(eval $@_IMAGE_NAME := $(DOCKER_REPO):$($@_TAG))
 
 	@printf "$(STYLE_TITLE)Running tests for tag $($@_TAG) $(STYLE_RESET)\\n"
 
-	@printf "Image was built: "
+	@printf "Image \"%s\" was built: " "$($@_IMAGE_NAME)"
 	@$(call status_after_run, test -n "$$(docker image ls $($@_IMAGE_NAME) --quiet)")
 
-	@printf "Image contains label \"org.label-schema.version\" with version \"$($@_TAG)\": "
+	@printf "Image \"%s\" contains label \"org.label-schema.version\" with version \"$($@_TAG_VERSION)\": " "$($@_IMAGE_NAME)"
 	@$(call status_after_run, \
 		docker inspect --format "{{ index .Config.Labels \"org.label-schema.version\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
-			| grep --quiet "\b$($@_TAG)\b" \
+			| grep --quiet "\b$($@_TAG_VERSION)\b" \
 	)
 
-	@printf "Image contains label \"org.label-schema.docker.cmd\" with version \"$($@_TAG)\": "
+	@printf "Image \"%s\" contains label \"org.label-schema.docker.cmd\" with tag \"$($@_TAG)\": " "$($@_IMAGE_NAME)"
 	@$(call status_after_run, \
 		docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
 			| grep --quiet "\b$($@_TAG)\b" \
@@ -222,10 +222,10 @@ test-tag-%-image:
 	@printf "Container understands entrypoint override: "
 	@$(call status_after_run, docker run --rm --entrypoint "" $($@_IMAGE_NAME) ls "$$(command -v ls)")
 
-	@printf "Container version contains \"$($@_TAG_PACKAGE_VERSION)\": "
+	@printf "Container version contains \"$($@_TAG_VERSION)\": "
 	@$(call status_after_run, \
 		docker run --rm $($@_IMAGE_NAME) $(COMMAND_FOR_VERSION) \
-			| head -n 1 | grep --quiet "$($@_TAG_PACKAGE_VERSION)" \
+			| head -n 1 | grep --quiet "$($@_TAG_VERSION)" \
 	)
 
 # Test the image from the docker-compose.test.yml file
@@ -235,16 +235,16 @@ test-docker-compose-image:
 
 	@printf "$(STYLE_TITLE)Running tests for $(DOCKER_COMPOSE_FILE_PATH) $(STYLE_RESET)\\n"
 
-	@printf "Image was built: "
+	@printf "Image \"%s\" was built: " "$($@_IMAGE_NAME)"
 	@$(call status_after_run, test -n "$$(docker image ls $($@_IMAGE_NAME) --quiet)")
 
-	@printf "Image contains label \"org.label-schema.version\" with version \"$(DOCKERFILE_TAG)\": "
+	@printf "Image \"%s\" contains label \"org.label-schema.version\" with version \"$(DOCKERFILE_VERSION)\": " "$($@_IMAGE_NAME)"
 	@$(call status_after_run, \
 		docker inspect --format "{{ index .Config.Labels \"org.label-schema.version\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
-			| grep --quiet "\b$(DOCKERFILE_TAG)\b" \
+			| grep --quiet "\b$(DOCKERFILE_VERSION)\b" \
 	)
 
-	@printf "Image contains label \"org.label-schema.docker.cmd\" with version \"$(DOCKERFILE_TAG)\": "
+	@printf "Image \"%s\" contains label \"org.label-schema.docker.cmd\" with tag \"$(DOCKERFILE_TAG)\": " "$($@_IMAGE_NAME)"
 	@$(call status_after_run, \
 		docker inspect --format "{{ index .Config.Labels \"org.label-schema.docker.cmd\" }}" $$(docker images $($@_IMAGE_NAME) --quiet) \
 			| grep --quiet "\b$(DOCKERFILE_TAG)\b" \
@@ -265,10 +265,10 @@ test-docker-compose-image:
 	@printf "Container understands entrypoint override: "
 	@$(call status_after_run, docker-compose --file $(DOCKER_COMPOSE_FILE_PATH) --project-name ci --no-ansi run --rm --entrypoint "" sut ls "$$(command -v ls)")
 
-	@printf "Container version contains \"$(DOCKERFILE_PACKAGE_VERSION)\": "
+	@printf "Container version contains \"$(DOCKERFILE_VERSION)\": "
 	@$(call status_after_run, \
 		docker-compose --file $(DOCKER_COMPOSE_FILE_PATH) --project-name ci --no-ansi run --rm sut $(COMMAND_FOR_VERSION) \
-			| head -n 1 | grep --quiet "$(DOCKERFILE_PACKAGE_VERSION)" \
+			| head -n 1 | grep --quiet "$(DOCKERFILE_VERSION)" \
 	)
 
 # Run all tests in verbose mode

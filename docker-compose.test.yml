@@ -6,6 +6,5 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - SOURCE_BRANCH
         - IMAGE_NAME
     command: --version
