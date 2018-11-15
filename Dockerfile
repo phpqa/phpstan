@@ -3,7 +3,7 @@
 ARG BASE_IMAGE="php:7.2-alpine"
 ARG PACKAGIST_NAME="phpstan/phpstan"
 ARG PHPQA_NAME="phpstan"
-ARG VERSION="0.9.2"
+ARG VERSION="0.10.5"
 
 # Build image
 
